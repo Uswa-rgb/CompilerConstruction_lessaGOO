@@ -5,6 +5,7 @@ public class main {
 
     public static void main(String[] args) {
         System.out.println("HALLOHALLO.. I V TIORED");
-	System.out.println("HIHIH I WAS HERE");
+        System.out.println("HIHIH I WAS HERE");
+        int x = 10;
     }
 }
