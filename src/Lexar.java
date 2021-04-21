@@ -8,7 +8,11 @@ import java.util.ArrayList;
 
 public class Lexar {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
+        System.out.println("Enter path to source file: ");
+        BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
+        String src_path = bf.readLine();
+        System.out.println(src_path);
       
     }
 }
