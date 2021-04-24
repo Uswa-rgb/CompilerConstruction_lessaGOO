@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.regex.*;
 
 public class Lexar {
 
@@ -27,7 +28,40 @@ public class Lexar {
         char[] fi = fs.toCharArray();
         int idx = 0;
         int state = 0;
-        return null;
+        int line_num = 0;
+
+        while (idx < fs.length()) {
+            switch (state) {
+            case 0:
+                if (Pattern.matches("\\s", "" + fi[idx])) {
+                    // TODO: Check for exiting string that might be num, identifier or keyword
+                    idx++;
+                    state = 0;
+                } else if (fi[idx] == '\n') {
+                    // TODO: Check for existing string just like above
+                    idx++;
+                    line_num++;
+                    state = 0;
+                } else if (Pattern.matches("[\\+\\-\\*/]", "" + fi[idx])) {
+                    // Arithematic operator encountered
+                    // TODO: Check for existing string again just like above
+                    idx++;
+                    state = 1;
+                } else if (Pattern.matches("[<=>]", "" + fi[idx])) {
+                    // Relational operator encountered
+                    idx++;
+                    state = 2;
+                } else if (Pattern.matches("[,;:]", "" + fi[idx])) {
+                    // Punctuation symbols
+                    idx++;
+                    state = 3;
+                }
+                break;
+            case -1:
+                break;
+            }
+        }
+
     }
 
     public static void main(String[] args) throws IOException {
