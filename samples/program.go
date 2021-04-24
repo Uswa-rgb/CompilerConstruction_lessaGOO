@@ -2,7 +2,7 @@ func Integer: numPrint (Integer: num, Integer: length)
 {
 	Integer: i, j, first, temp;
 	char : a;
-	a := ‘x’;
+	a := 'x';
 	print ( "enter number" );
 	In>> i;
 	println (i);
@@ -17,14 +17,14 @@ func Integer: numPrint (Integer: num, Integer: length)
 			j := j + 1;
 		}
 		if j == 1:{
-			print(“one”);
+			print("one");
 		}
 		elif j==2:{
-			print(“two”);
+			print("two");
 		}
 		else
 		{
-				print(“others”);
+				print("others");
 				}
 		/* this is a comment */
 		i:= i - 1;
@@ -32,7 +32,7 @@ func Integer: numPrint (Integer: num, Integer: length)
 				Multiline
 				Comment*/
 	}
-	print ( “temp is “);
+	print ( "temp is ");
 	println(temp);
 	ret i;
 
