@@ -7,10 +7,27 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.Key;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.regex.*;
 
 public class Lexar {
+    public static HashMap<String, Tokens> Keywords;
+    static {
+        Keywords = new HashMap<>();
+        Keywords.put("Integer", Tokens.INT);
+        Keywords.put("char", Tokens.CHAR);
+        Keywords.put("if", Tokens.DS);
+        Keywords.put("elif", Tokens.DS);
+        Keywords.put("else", Tokens.DS);
+        Keywords.put("while", Tokens.WHILE);
+        Keywords.put("In", Tokens.IOF);
+        Keywords.put("print", Tokens.IOF);
+        Keywords.put("println", Tokens.IOF);
+        Keywords.put("func", Tokens.FUNC);
+        Keywords.put("ret", Tokens.RET);
+    }
 
     static String openFile(String path) throws IOException {
         if (!path.endsWith(".go")) {
@@ -20,6 +37,23 @@ public class Lexar {
 
         String content = Files.readString(Paths.get(path));
         return content;
+    }
+
+    static Tokens isKeyword(String word) {
+        return Keywords.get(word);
+    }
+
+    static Pair<Tokens, String> handleWord(String word) {
+        Tokens token = isKeyword(word);
+        if (token != null)
+            return new Pair<Tokens, String>(token, word);
+        // or identifier
+        else if (Pattern.matches("^[a-zA-Z][a-zA-Z0-9]*$", word))
+            return new Pair<Tokens, String>(Tokens.ID, word);
+        // or integer
+        else if (Pattern.matches("^[0-9]*$", word))
+            return new Pair<Tokens, String>(Tokens.NUM, word);
+        return null;
     }
 
     static ArrayList<Pair<Tokens, String>> createTokens(String fs) throws Exception {
@@ -34,24 +68,58 @@ public class Lexar {
             switch (state) {
             case 0:
                 if (Pattern.matches("\\s", "" + fi[idx])) {
-                    // TODO: Check for exiting string that might be num, identifier or keyword
+                    if (buffer.length() != 0) {
+                        Pair<Tokens, String> pair = handleWord(buffer.toString());
+                        if (pair == null) {
+                            state = -1;
+                            System.out.println(
+                                    "[!] ERROR: Token does not match keyword, identifier format or numerical constant.");
+                            break;
+                        }
+                        tokenLexemePairs.add(pair);
+                        buffer.setLength(0);
+                    }
                     idx++;
                     state = 0;
+
                 } else if (fi[idx] == '\n') {
-                    // TODO: Check for existing string just like above
+                    if (buffer.length() != 0) {
+                        Pair<Tokens, String> pair = handleWord(buffer.toString());
+                        if (pair == null) {
+                            state = -1;
+                            System.out.println(
+                                    "[!] ERROR: Token does not match keyword, identifier format or numerical constant.");
+                            break;
+                        }
+                        tokenLexemePairs.add(pair);
+                        buffer.setLength(0);
+                    }
                     idx++;
                     line_num++;
                     state = 0;
+
                 } else if (Character.isLetter(fi[idx]) || Character.isDigit(fi[idx])) {
                     // letter or digit encountered
                     buffer.append(fi[idx]);
                     idx++;
                     state = 0;
+
                 } else if (Pattern.matches("[\\+\\-\\*/]", "" + fi[idx])) {
                     // Arithematic operator encountered
-                    // TODO: Check for existing string again just like above
+                    if (buffer.length() != 0) {
+                        Pair<Tokens, String> pair = handleWord(buffer.toString());
+                        if (pair == null) {
+                            state = -1;
+                            System.out.println(
+                                    "[!] ERROR: Token does not match keyword, identifier format or numerical constant.");
+                            break;
+                        }
+                        tokenLexemePairs.add(pair);
+                        buffer.setLength(0);
+                    }
                     idx++;
                     state = 1;
+
                 } else if (Pattern.matches("[<=>]", "" + fi[idx])) {
                     // Relational operator encountered
                     idx++;
@@ -64,16 +132,42 @@ public class Lexar {
                     // Parenthesis / Brackets / Squares
                     idx++;
                     state = 4;
-                } else if (Pattern.matches("[\'\"]", input)) {
+                } else if (Pattern.matches("[\'\"]", "" + fi[idx])) {
                     // single quote / double quote
                     idx++;
                     state = 5;
                 } else {
-                    System.out.println();
+                    // System.out.println();
                     state = -1;
                 }
                 break;
             case 1:
+                // check against all arithematic operators and handle edge cases with other
+                // kinds of operators
+                if (fi[idx - 1] == '+')
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.AO, "+"));
+                else if (fi[idx - 1] == '-')
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.AO, "-"));
+                else if (fi[idx - 1] == '/') {
+                    if (fi[idx] == '=') // not equal to case
+                    {
+                        tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.RO, "/="));
+                        idx++;
+                    } else if (fi[idx] == '*') // start of string case
+                    {
+                        // TODO: skip the entire comment
+                    } else // simple division case
+                        tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.AO, "/"));
+                } else if (fi[idx - 1] == '*') {
+                    if (fi[idx] == '/') {
+                        // abandoned end of comment marker, throw error
+                        state = -1;
+                        System.out.println("[!] ERROR: Lone end of comment marker encountere */.");
+                        break;
+                    }
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokesn.AO, "*"));
+                }
+                state = 0;
                 break;
             case 2:
                 break;
@@ -86,13 +180,13 @@ public class Lexar {
             case -1:
                 throw new Exception("[!] ERROR: Unknown Token encountered: " + buffer.toString() + " " + fi[idx]
                         + " on line: " + line_num);
-                break;
             }
         }
-
+        return tokenLexemePairs;
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws Exception {
+        Lexar lex = new Lexar();
         System.out.println("Enter path to source file: ");
         BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
         String src_path = bf.readLine();
