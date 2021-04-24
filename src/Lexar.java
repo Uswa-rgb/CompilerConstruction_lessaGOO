@@ -122,22 +122,71 @@ public class Lexar {
 
                 } else if (Pattern.matches("[<=>]", "" + fi[idx])) {
                     // Relational operator encountered
+                    if (buffer.length() != 0) {
+                        Pair<Tokens, String> pair = handleWord(buffer.toString());
+                        if (pair == null) {
+                            state = -1;
+                            System.out.println(
+                                    "[!] ERROR: Token does not match keyword, identifier format or numerical constant.");
+                            break;
+                        }
+                        tokenLexemePairs.add(pair);
+                        buffer.setLength(0);
+                    }
+
                     idx++;
                     state = 2;
+
                 } else if (Pattern.matches("[,;:]", "" + fi[idx])) {
                     // Punctuation symbols
+                    if (buffer.length() != 0) {
+                        Pair<Tokens, String> pair = handleWord(buffer.toString());
+                        if (pair == null) {
+                            state = -1;
+                            System.out.println(
+                                    "[!] ERROR: Token does not match keyword, identifier format or numerical constant.");
+                            break;
+                        }
+                        tokenLexemePairs.add(pair);
+                        buffer.setLength(0);
+                    }
+
                     idx++;
                     state = 3;
-                } else if (Pattern.matches("regex", "" + fi[idx])) {
+
+                } else if (Pattern.matches("[\\[\\](){}]", "" + fi[idx])) {
                     // Parenthesis / Brackets / Squares
+                    if (buffer.length() != 0) {
+                        Pair<Tokens, String> pair = handleWord(buffer.toString());
+                        if (pair == null) {
+                            state = -1;
+                            System.out.println(
+                                    "[!] ERROR: Token does not match keyword, identifier format or numerical constant.");
+                            break;
+                        }
+                        tokenLexemePairs.add(pair);
+                        buffer.setLength(0);
+                    }
                     idx++;
                     state = 4;
+
                 } else if (Pattern.matches("[\'\"]", "" + fi[idx])) {
                     // single quote / double quote
+                    if (buffer.length() != 0) {
+                        Pair<Tokens, String> pair = handleWord(buffer.toString());
+                        if (pair == null) {
+                            state = -1;
+                            System.out.println(
+                                    "[!] ERROR: Token does not match keyword, identifier format or numerical constant.");
+                            break;
+                        }
+                        tokenLexemePairs.add(pair);
+                        buffer.setLength(0);
+                    }
                     idx++;
                     state = 5;
+
                 } else {
-                    // System.out.println();
                     state = -1;
                 }
                 break;
@@ -165,17 +214,82 @@ public class Lexar {
                         System.out.println("[!] ERROR: Lone end of comment marker encountere */.");
                         break;
                     }
-                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokesn.AO, "*"));
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.AO, "*"));
                 }
                 state = 0;
                 break;
             case 2:
+                if (fi[idx - 1] == '=')
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.RO, "="));
+                else if (fi[idx - 1] == '<') {
+                    if (fi[idx] == '=') {
+                        tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.RO, "<="));
+                        idx++;
+                    } else
+                        tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.RO, "<"));
+                } else if (fi[idx - 1] == '>') {
+                    if (fi[idx] == '>') // input operator case
+                    {
+                        tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.IO, ">>"));
+                        idx++;
+                    } else if (fi[idx] == '=') {
+                        tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.RO, ">="));
+                        idx++;
+                    } else
+                        tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.RO, ">"));
+                }
+                state = 0;
                 break;
             case 3:
+                if (fi[idx - 1] == ',')
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.PUNCT, ","));
+                else if (fi[idx - 1] == ';')
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.PUNCT, ";"));
+                else if (fi[idx - 1] == ':') {
+                    if (fi[idx] == '=') { // variable assingment operator case
+                        tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.ASO, ":="));
+                        idx++;
+                    } else
+                        tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.PUNCT, ":"));
+                }
+                state = 0;
                 break;
             case 4:
+                if (fi[idx - 1] == '[')
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.BRKT, "["));
+                else if (fi[idx - 1] == ']')
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.BRKT, "]"));
+                else if (fi[idx - 1] == '{')
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.BRKT, "{"));
+                else if (fi[idx - 1] == '}')
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.BRKT, "}"));
+                else if (fi[idx - 1] == '(')
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.BRKT, "("));
+                else if (fi[idx - 1] == ')')
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.BRKT, ")"));
+                state = 0;
                 break;
             case 5:
+                if (fi[idx - 1] == '\'') {
+                    if (fi[idx + 1] != '\'') { // character literal exceeding 1 character
+                        System.out.println("[!] ERROR: Character literal exceeding 1 character size.");
+                        state = -1;
+                        break;
+                    }
+                    tokenLexemePairs
+                            .add(new Pair<Tokens, String>(Tokens.LTC, "" + fi[idx - 1] + fi[idx] + fi[idx + 1]));
+                    idx += 2;
+                } else if (fi[idx - 1] == '\"') {
+                    int nidx = fs.indexOf("\"", idx);
+                    if (nidx == -1) {
+                        System.out.println("[!] Error: String Literal imporper termination.");
+                        state = -1;
+                        break;
+                    }
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.STR, fs.substring(idx, nidx + 1)));
+                    idx = nidx + 1;
+                }
+                state = 0;
                 break;
             case -1:
                 throw new Exception("[!] ERROR: Unknown Token encountered: " + buffer.toString() + " " + fi[idx]
