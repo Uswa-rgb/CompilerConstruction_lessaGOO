@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -293,7 +294,7 @@ public class Lexar {
                         state = -1;
                         break;
                     }
-                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.STR, fs.substring(idx, nidx + 1)));
+                    tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.STR, fs.substring(idx - 1, nidx + 1)));
                     idx = nidx + 1;
                 }
                 state = 0;
@@ -307,7 +308,6 @@ public class Lexar {
     }
 
     public static void main(String[] args) throws Exception {
-        Lexar lex = new Lexar();
         System.out.println("Enter path to source file: ");
         BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
         String src_path = bf.readLine();
@@ -319,9 +319,12 @@ public class Lexar {
         }
         ArrayList<Pair<Tokens, String>> tokenLexemes = createTokens(fr);
         if (tokenLexemes != null) {
+            BufferedWriter writer = new BufferedWriter(new FileWriter(new File("words.txt")));
             for (Pair<Tokens, String> pair : tokenLexemes) {
-                System.out.println(pair.a + " : " + pair.b);
+                writer.write(pair.a + "\t->\t" + pair.b + "\n");
+                System.out.println(pair.a + "\t->\t" + pair.b);
             }
+            writer.close();
         }
     }
 }
