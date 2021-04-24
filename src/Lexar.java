@@ -204,7 +204,13 @@ public class Lexar {
                         idx++;
                     } else if (fi[idx] == '*') // start of string case
                     {
-                        // TODO: skip the entire comment
+                        int nidx = fs.indexOf("*/", idx);
+                        if (nidx == -1) {
+                            System.out.println("[!] Error: Dangling Comment, no end.");
+                            state = -1;
+                            break;
+                        }
+                        idx = nidx + 1;
                     } else // simple division case
                         tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.AO, "/"));
                 } else if (fi[idx - 1] == '*') {
@@ -218,6 +224,7 @@ public class Lexar {
                 }
                 state = 0;
                 break;
+
             case 2:
                 if (fi[idx - 1] == '=')
                     tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.RO, "="));
