@@ -22,13 +22,13 @@ public class Lexar {
         return content;
     }
 
-    static ArrayList<Pair<Tokens, String>> createTokens(String fs) {
+    static ArrayList<Pair<Tokens, String>> createTokens(String fs) throws Exception {
         ArrayList<Pair<Tokens, String>> tokenLexemePairs = new ArrayList<Pair<Tokens, String>>();
         StringBuilder buffer = new StringBuilder();
         char[] fi = fs.toCharArray();
         int idx = 0;
         int state = 0;
-        int line_num = 0;
+        int line_num = 1;
 
         while (idx < fs.length()) {
             switch (state) {
@@ -41,6 +41,11 @@ public class Lexar {
                     // TODO: Check for existing string just like above
                     idx++;
                     line_num++;
+                    state = 0;
+                } else if (Character.isLetter(fi[idx]) || Character.isDigit(fi[idx])) {
+                    // letter or digit encountered
+                    buffer.append(fi[idx]);
+                    idx++;
                     state = 0;
                 } else if (Pattern.matches("[\\+\\-\\*/]", "" + fi[idx])) {
                     // Arithematic operator encountered
@@ -55,9 +60,32 @@ public class Lexar {
                     // Punctuation symbols
                     idx++;
                     state = 3;
+                } else if (Pattern.matches("regex", "" + fi[idx])) {
+                    // Parenthesis / Brackets / Squares
+                    idx++;
+                    state = 4;
+                } else if (Pattern.matches("[\'\"]", input)) {
+                    // single quote / double quote
+                    idx++;
+                    state = 5;
+                } else {
+                    System.out.println();
+                    state = -1;
                 }
                 break;
+            case 1:
+                break;
+            case 2:
+                break;
+            case 3:
+                break;
+            case 4:
+                break;
+            case 5:
+                break;
             case -1:
+                throw new Exception("[!] ERROR: Unknown Token encountered: " + buffer.toString() + " " + fi[idx]
+                        + " on line: " + line_num);
                 break;
             }
         }
