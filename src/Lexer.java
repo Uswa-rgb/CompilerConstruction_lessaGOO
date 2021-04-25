@@ -1,19 +1,16 @@
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.Key;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.*;
 
-public class Lexar {
+public class Lexer {
     public static HashMap<String, Tokens> Keywords;
     static {
         Keywords = new HashMap<>();
@@ -35,7 +32,6 @@ public class Lexar {
             System.out.println("ERROR: Incorrect File Extention. Program exiting.");
             return null;
         }
-
         String content = Files.readString(Paths.get(path));
         return content;
     }
@@ -83,7 +79,7 @@ public class Lexar {
                     idx++;
                     state = 0;
 
-                } else if (fi[idx] == '\n') {
+                } else if (fi[idx] == '\n' || fi[idx] == '\r') {
                     if (buffer.length() != 0) {
                         Pair<Tokens, String> pair = handleWord(buffer.toString());
                         if (pair == null) {
@@ -96,7 +92,7 @@ public class Lexar {
                         buffer.setLength(0);
                     }
                     idx++;
-                    line_num++;
+                    line_num += 1;
                     state = 0;
 
                 } else if (Character.isLetter(fi[idx]) || Character.isDigit(fi[idx])) {
@@ -209,7 +205,7 @@ public class Lexar {
                         if (nidx == -1) {
                             System.out.println("[!] Error: Dangling Comment, no end.");
                             state = -1;
-                            break;
+                            break; // */ a
                         }
                         idx = nidx + 1;
                     } else // simple division case
@@ -278,7 +274,7 @@ public class Lexar {
                 state = 0;
                 break;
             case 5:
-                if (fi[idx - 1] == '\'') {
+                if (fi[idx - 1] == '\'') { // char z = 'b'
                     if (fi[idx + 1] != '\'') { // character literal exceeding 1 character
                         System.out.println("[!] ERROR: Character literal exceeding 1 character size.");
                         state = -1;
@@ -304,6 +300,7 @@ public class Lexar {
                         + " on line: " + line_num);
             }
         }
+        System.out.println("[!] Processing complete. Processed Lines: ");
         return tokenLexemePairs;
     }
 
@@ -321,8 +318,8 @@ public class Lexar {
         if (tokenLexemes != null) {
             BufferedWriter writer = new BufferedWriter(new FileWriter(new File("words.txt")));
             for (Pair<Tokens, String> pair : tokenLexemes) {
-                writer.write(pair.a + "\t->\t" + pair.b + "\n");
-                System.out.println(pair.a + "\t->\t" + pair.b);
+                writer.write("(" + pair.a + ", " + pair.b + ")\n");
+                // System.out.println(pair.a + "\t->\t" + pair.b);
             }
             writer.close();
         }

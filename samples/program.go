@@ -1,8 +1,8 @@
-func Integer: numPrint (Integer: num, Integer: length)
+func String: numPrint (Integer: num, Integer: length)
 {
 	Integer: i, j, first, temp;
 	char : a;
-	a := 'x';
+	a :: 'x';
 	print ( "enter number" );
 	In>> i;
 	println (i);
