@@ -1,8 +1,8 @@
-func String: numPrint (Integer: num, Integer: length)
+func Integer: numPrint (Integer: num, Integer: length)
 {
 	Integer: i, j, first, temp;
 	char : a;
-	a :: 'x';
+	a := 'x';
 	print ( "enter number" );
 	In>> i;
 	println (i);
@@ -13,13 +13,13 @@ func String: numPrint (Integer: num, Integer: length)
 		j := 1;
 		while j < i:
 		{
-			print( j);
+			write( j);
 			j := j + 1;
 		}
-		if j == 1:{
+		if j = 1:{
 			print("one");
 		}
-		elif j==2:{
+		elif j=2:{
 			print("two");
 		}
 		else

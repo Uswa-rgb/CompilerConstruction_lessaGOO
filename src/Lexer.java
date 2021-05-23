@@ -199,7 +199,7 @@ public class Lexer {
                     {
                         tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.RO, "/="));
                         idx++;
-                    } else if (fi[idx] == '*') // start of string case
+                    } else if (fi[idx] == '*') // start of comment case
                     {
                         int nidx = fs.indexOf("*/", idx);
                         if (nidx == -1) {
@@ -207,7 +207,7 @@ public class Lexer {
                             state = -1;
                             break; // */ a
                         }
-                        idx = nidx + 1;
+                        idx = nidx + 2;
                     } else // simple division case
                         tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.AO, "/"));
                 } else if (fi[idx - 1] == '*') {
@@ -300,28 +300,36 @@ public class Lexer {
                         + " on line: " + line_num);
             }
         }
+        if(fi[idx-1] == '}')
+            tokenLexemePairs.add(new Pair<Tokens, String>(Tokens.BRKT, "}"));
         System.out.println("[!] Processing complete. Processed Lines: ");
         return tokenLexemePairs;
     }
 
-    public static void main(String[] args) throws Exception {
-        System.out.println("Enter path to source file: ");
-        BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
-        String src_path = bf.readLine();
-        System.out.println(src_path);
-
-        String fr = openFile(src_path);
+    public void lexicalAnalysis(String path, String destination) throws Exception{
+        String fr = openFile(path);
         if (fr == null) {
             System.exit(1);
         }
         ArrayList<Pair<Tokens, String>> tokenLexemes = createTokens(fr);
         if (tokenLexemes != null) {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(new File("words.txt")));
+            BufferedWriter writer = new BufferedWriter(new FileWriter(new File(destination)));
             for (Pair<Tokens, String> pair : tokenLexemes) {
                 writer.write("(" + pair.a + ", " + pair.b + ")\n");
                 // System.out.println(pair.a + "\t->\t" + pair.b);
             }
             writer.close();
         }
+    }
+
+    public static void main(String[] args) throws Exception {
+        // THIS IS JUST FOR TESTING
+        System.out.println("Enter path to source file: ");
+        BufferedReader bf = new BufferedReader(new InputStreamReader(System.in));
+        String src_path = bf.readLine();
+
+        Lexer lex = new Lexer();
+        lex.lexicalAnalysis(src_path, "./words.txt");
+
     }
 }
