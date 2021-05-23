@@ -1,0 +1,7 @@
+Identifier	Data Type
+numPrint	FUNC
+a	CHAR
+temp	INT
+i	INT
+j	INT
+first	INT
