@@ -1,29 +1,35 @@
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.util.ArrayList;
 
 public class Parser {
     BufferedReader wordFileReader;
     Pair<Tokens, String> look;
+    ArrayList<Pair<Tokens,String>> tokens; 
+    int tokenIdx;
 
-    public BufferedReader openWordsFile(String path) throws Exception {
+    public void openWordsFile(String path) throws Exception {
+        this.tokenIdx = 0;
         wordFileReader = new BufferedReader(new FileReader(new File(path)));
-        return wordFileReader;
+        this.tokens = new ArrayList<Pair<Tokens,String>>();
+        String buffer;
+        while((buffer = wordFileReader.readLine()) != null && buffer.length() != 0){
+            int comma = buffer.indexOf(',', 1);
+            String first = buffer.substring(1, comma);
+            String second = buffer.substring(comma + 2, buffer.length() - 1);
+            this.tokens.add(Pair<Tokens, String>(Tokens.valueOf(first), second));
+        }
     }
 
     public Pair<Tokens, String> nextToken() throws Exception {
-        String line = this.wordFileReader.readLine();
-        if (line == null)
-            return null;
-        int comma = line.indexOf(',', 1);
-        String first = line.substring(1, comma);
-        String second = line.substring(comma + 2, line.length() - 1);
-        return new Pair<Tokens, String>(Tokens.valueOf(first), second);
+        Pair<Tokens, String> pair = this.tokens.get(tokenIdx);
+        this.tokenIdx++;
+        return pair;
     }
 
     public void match(Tokens token) {
         try {
-
             if (look.a == token)
                 look = nextToken();
             else
@@ -182,7 +188,7 @@ public class Parser {
 
     public void VAL() throws Exception {
         // TODO: verify this function too
-        if (this.look.a.equals(Tokens.NUM))
+        if (this.look.a.equals(Tokens.NUM) && !(this.tokens.get(tokenIdx).a.equals(Tokens.AO)))
             this.match(Tokens.NUM);
         else if (this.look.a.equals(Tokens.LTC))
             this.match(Tokens.LTC);
@@ -208,10 +214,9 @@ public class Parser {
     }
 
     public void DATA() throws Exception {
-        // TODO: Confirm this weird recursion
-        if (this.look.a.equals(Tokens.ID))
+        if (this.look.a.equals(Tokens.ID) && !(this.tokens.get(tokenIdx).a.equals(Tokens.AO)))
             this.match(Tokens.ID);
-        else if (this.look.a.equals(Tokens.NUM))
+        else if (this.look.a.equals(Tokens.NUM) && !(this.tokens.get(tokenIdx).a.equals(Tokens.AO)))
             this.match(Tokens.NUM);
         else if (this.look.a.equals(Tokens.LTC))
             this.match(Tokens.LTC);
@@ -222,18 +227,10 @@ public class Parser {
     }
 
     public void INS() throws Exception {
-        this.match(Tokens.IOF);
+        this.match(Tokens.IOF, "In");
         this.match(Tokens.IO);
-        this.INE();
-    }
-
-    public void INE() throws Exception {
-        // TODO: Confirm this function recursion
         this.match(Tokens.ID);
-        if (this.look.a.equals(Tokens.IO)) {
-            this.match(Tokens.IO);
-            this.INE();
-        }
+        this.macth(Tokens.PUNCT, ";");
     }
 
     public void LS() throws Exception {
@@ -323,8 +320,24 @@ public class Parser {
     }
 
     public void ST() throws Exception {
-        // TODO: How do we differentiate between the types of statements if all of them
-        // are cfgs?
+        if (this.tokens.get(tokenIdx).a.equals(Tokens.AO))
+            this.AE();
+        else if (this.tokens.get(tokenIdx).a.equals(Tokens.RO))
+            this.LE();
+        else if (this.tokens.get(tokenIdx).a.equals(Tokens.PUNCT))
+            this.VDS();
+        else if (this.tokens.get(tokenIdx).a.equals(Tokens.ASO))
+            this.VAS();
+        else if (this.look.b.matches("print"))
+            this.PS();
+        else if (this.look.b.equals("In"))
+            this.INS();
+        else if (this.look.a.equals(Tokens.WHILE))
+            this.LS();
+        else if (this.look.b.equals("if"))
+            this.CS();
+        else 
+            throw new Exception("MATCH FAILED: unknown or invalid token/lexeme in look, encountered at ST()");
     }
 
     // Main for testing begins here
