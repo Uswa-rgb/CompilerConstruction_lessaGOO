@@ -28,6 +28,7 @@ public class Compiler {
         else{
             System.out.println("[++] Parser terminated successfully.");
             p.dumpSymbolTable();
+            p.dump3AddCode();
             System.out.println("[++] Symbol table dumped.");
             System.exit(0);
         }

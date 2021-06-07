@@ -1,7 +1,6 @@
 Identifier	Data Type
-numPrint	FUNC
-a	CHAR
-temp	INT
-i	INT
-j	INT
-first	INT
+a         CHAR      16
+temp      INT       12
+i         INT       0
+j         INT       4
+first     INT       8

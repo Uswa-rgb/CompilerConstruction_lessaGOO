@@ -5,25 +5,34 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.locks.StampedLock;
 import java.io.File;
 
 public class Parser {
     ArrayList<Pair<Tokens, String>> tokens;
-    HashMap<String, Tokens> symbolTable;
+    ArrayList<StringBuilder> _3AC;
+    HashMap<String, Pair<Tokens, Integer>> symbolTable;
     BufferedWriter treBufferedWriter;
     BufferedReader wordFileReader;
     Pair<Tokens, String> look;
+    Boolean toPrint = true;
     Tokens curr_dt;
     int tokenIdx;
+    int temp;
+    int nextVar;
+    int lines;
     int tabs;
 
     Parser() {
         try {
-
             this.tabs = 0;
-            this.tokens = new ArrayList<Pair<Tokens, String>>();
+            this.lines = 1;
             this.tokenIdx = 0;
+            this.nextVar = 0;
+            this.temp = 1;
+            this._3AC = new ArrayList<>();
             this.symbolTable = new HashMap<>();
+            this.tokens = new ArrayList<Pair<Tokens, String>>();
             this.treBufferedWriter = new BufferedWriter(new FileWriter(new File("./parse_tree.txt")));
         } catch (Exception e) {
             System.out.println("[Parser - Init] Exception Occurred.");
@@ -31,26 +40,66 @@ public class Parser {
         }
     }
 
-    public void dumpSymbolTable(){
-        try{
+    public String nextTemp() {
+        return "T" + this.temp++;
+    }
+
+    public void dumpSymbolTable() {
+        try {
+            StringBuilder buffer = new StringBuilder();
             FileWriter st = new FileWriter("./symbol_table.txt");
             st.write("Identifier\tData Type\n");
-            this.symbolTable.forEach((k, v) -> {
+            this.symbolTable.forEach((k, p) -> {
                 try {
-                    st.write(k + "\t" + v + "\n");
+                    buffer.append(k);
+                    for (int i = 0; i < 10 - k.length(); i++)
+                        buffer.append(" ");
+                    buffer.append(p.a);
+                    for (int i = 0; i < 10 - p.a.toString().length(); i++)
+                        buffer.append(" ");
+                    buffer.append(p.b).append("\n");
+                    st.write(buffer.toString());
+                    buffer.setLength(0);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             });
             st.close();
-        }
-        catch(IOException e){
+        } catch (IOException e) {
             System.out.println("[Parser-DST] Exception Occurred.");
             System.out.println(e);
         }
     }
 
-    public void emit(String str) {
+    public void dump3AddCode() {
+        try {
+            FileWriter st = new FileWriter("./tac.txt");
+            this._3AC.forEach((s) -> {
+                try {
+                    st.write(s.toString() + "\n");
+                } catch (IOException e) {
+                    System.out.println("[Parser-D3AC] Exception Occurred.");
+                    System.out.println(e);
+                }
+            });
+            st.close();
+        } catch (IOException e) {
+            System.out.println("[Parser-D3AC] Exception Occurred.");
+            System.out.println(e);
+        }
+    }
+
+    public void backpatch(int src, int dest) {
+        this._3AC.get(src - 1).append(" ").append(dest);
+    }
+
+    public void TAEmit(String str) {
+        // emit code
+        this._3AC.add(new StringBuilder(str));
+        this.lines++;
+    }
+
+    public void STEmit(String str) {
         try {
 
             String buffer = new String();
@@ -59,7 +108,8 @@ public class Parser {
             buffer = buffer + "|__" + str + "\n";
 
             // printing to screen
-            System.out.print(buffer);
+            if (this.toPrint)
+                System.out.print(buffer);
             // writing to file
             this.treBufferedWriter.write(buffer);
             this.treBufferedWriter.flush();
@@ -119,159 +169,200 @@ public class Parser {
         // Program -> FS Program | NULL
         if (this.look != null && this.look.a == Tokens.FUNC) {
             this.tabs++;
-            this.emit("FS()");
+            this.STEmit("FS()");
             this.FS();
-            this.emit("Program()");
+            this.STEmit("Program()");
             this.Program();
             this.tabs--;
         }
     }
 
-    public void LE() throws Exception {
+    public String LE() throws Exception {
+        StringBuilder expression = new StringBuilder();
         this.tabs++;
-        this.emit("LID()");
-        this.LID();
-        this.emit("LO()");
-        this.LO();
-        this.emit("LID()");
-        this.LID();
+        this.STEmit("LID()");
+        expression.append(this.LID());
+        this.STEmit("LO()");
+        expression.append(this.LO());
+        this.STEmit("LID()");
+        expression.append(this.LID());
         this.tabs--;
+        return expression.toString();
     }
 
-    public void LID() throws Exception {
+    public String LID() throws Exception {
+        String ret = new String();
         this.tabs++;
         if (this.look.b.equals("true")) {
-            this.emit("DS -> true");
+            this.STEmit("DS -> true");
             this.match(Tokens.DS, "true");
+            ret = "true";
         } else if (this.look.b.equals("false")) {
-            this.emit("DS -> false");
+            this.STEmit("DS -> false");
             this.match(Tokens.DS, "false");
+            ret = "false";
         } else if (this.look.a.equals(Tokens.ID)) {
-            this.emit("ID -> " + this.look.b);
+            this.STEmit("ID -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.ID);
         } else if (this.look.a.equals(Tokens.NUM)) {
-            this.emit("NUM -> " + this.look.b);
+            this.STEmit("NUM -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.NUM);
         } else if (this.look.a.equals(Tokens.LTC)) {
-            this.emit("LTC -> " + this.look.b);
+            this.STEmit("LTC -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.LTC);
         } else
             throw new Exception("MATCH FAILED: unknown or invalid token/lexeme in LID");
         this.tabs--;
+        return ret;
     }
 
-    public void LO() throws Exception {
+    public String LO() throws Exception {
+        String ret = new String();
         this.tabs++;
         if (this.look.b.equals("<")) {
-            this.emit("RO -> " + this.look.b);
+            this.STEmit("RO -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.RO, "<");
         } else if (this.look.b.equals("<=")) {
-            this.emit("RO -> " + this.look.b);
+            this.STEmit("RO -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.RO, "<=");
         } else if (this.look.b.equals(">")) {
-            this.emit("RO -> " + this.look.b);
+            this.STEmit("RO -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.RO, ">");
         } else if (this.look.b.equals(">=")) {
-            this.emit("RO -> " + this.look.b);
+            this.STEmit("RO -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.RO, ">=");
         } else if (this.look.b.equals("=")) {
-            this.emit("RO -> " + this.look.b);
+            this.STEmit("RO -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.RO, "=");
         } else if (this.look.b.equals("/=")) {
-            this.emit("RO -> " + this.look.b);
+            this.STEmit("RO -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.RO, "/=");
         } else
             throw new Exception("MATCH FAILED: unknown or invalid token/lexeme in LO");
         this.tabs--;
+        return ret;
     }
 
-    public void AE() throws Exception {
+    public String AE() throws Exception {
         this.tabs++;
-        this.emit("EB()");
-        this.EB();
-        this.emit("R()");
-        this.R();
+        this.STEmit("EB()");
+        String op1 = this.EB();
+        this.STEmit("R()");
+        String ans = this.R(op1);
         this.tabs--;
+        return ans;
     }
 
-    public void R() throws Exception {
+    public String R(String op1) throws Exception {
         this.tabs++;
+        String op2;
+        String temp;
+        String ans;
         if (this.look.b.equals("+")) {
-            this.emit("AO -> " + this.look.b);
+            this.STEmit("AO -> " + this.look.b);
             this.match(Tokens.AO, "+");
-            this.emit("EB()");
-            this.EB();
-            this.emit("R()");
-            this.R();
+            this.STEmit("EB()");
+            op2 = this.EB();
+            temp = this.nextTemp();
+            this.TAEmit(temp + " = " + op1 + " + " + op2);
+            this.STEmit("R()");
+            ans = this.R(temp);
         } else if (this.look.b.equals("-")) {
-            this.emit("AO -> " + this.look.b);
+            this.STEmit("AO -> " + this.look.b);
             this.match(Tokens.AO, "-");
-            this.emit("EB()");
-            this.EB();
-            this.emit("R()");
-            this.R();
-        }
+            this.STEmit("EB()");
+            op2 = this.EB();
+            temp = this.nextTemp();
+            this.TAEmit(temp + " = " + op1 + " - " + op2);
+            this.STEmit("R()");
+            ans = this.R(temp);
+        } else
+            ans = op1;
         this.tabs--;
+        return ans;
     }
 
-    public void EB() throws Exception {
+    public String EB() throws Exception {
         this.tabs++;
-        this.emit("EC()");
-        this.EC();
-        this.emit("R1()");
-        this.R1();
+        this.STEmit("EC()");
+        String op1 = this.EC();
+        this.STEmit("R1()");
+        String ans = this.R1(op1);
         this.tabs--;
+        return ans;
     }
 
-    public void R1() throws Exception {
+    public String R1(String op1) throws Exception {
         this.tabs++;
+        String op2;
+        String temp;
+        String ans;
         if (this.look.b.equals("*")) {
-            this.emit("AO -> " + this.look.b);
+            this.STEmit("AO -> " + this.look.b);
             this.match(Tokens.AO, "*");
-            this.emit("EC()");
-            this.EC();
-            this.emit("R1()");
-            this.R1();
+            this.STEmit("EC()");
+            op2 = this.EC();
+            temp = this.nextTemp();
+            this.TAEmit(temp + " = " + op1 + " * " + op2);
+            this.STEmit("R1()");
+            ans = this.R1(temp);
         } else if (this.look.b.equals("/")) {
-            this.emit("AO -> " + this.look.b);
+            this.STEmit("AO -> " + this.look.b);
             this.match(Tokens.AO, "/");
-            this.emit("EC()");
-            this.EC();
-            this.emit("R1()");
-            this.R1();
-        }
+            this.STEmit("EC()");
+            op2 = this.EC();
+            temp = this.nextTemp();
+            this.TAEmit(temp + " = " + op1 + " / " + op2);
+            this.STEmit("R1()");
+            ans = this.R1(temp);
+        } else
+            ans = op1;
         this.tabs--;
+        return ans;
     }
 
-    public void EC() throws Exception {
+    public String EC() throws Exception {
+        String ret;
         this.tabs++;
         if (this.look.a.equals(Tokens.ID)) {
-            this.emit("ID -> " + this.look.b);
+            this.STEmit("ID -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.ID);
         } else if (this.look.a.equals(Tokens.NUM)) {
-            this.emit("ID -> " + this.look.b);
+            this.STEmit("ID -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.NUM);
         } else if (this.look.b.equals("(")) {
-            this.emit("BRKT -> " + this.look.b);
+            this.STEmit("BRKT -> " + this.look.b);
             this.match(Tokens.BRKT, "(");
-            this.emit("AE()");
-            this.AE();
-            this.emit("BRKT -> " + this.look.b);
+            this.STEmit("AE()");
+            ret = this.AE();
+            this.STEmit("BRKT -> " + this.look.b);
             this.match(Tokens.BRKT, ")");
         } else
             throw new Exception("MATCH FAILED: unknown or invalid token/lexeme in EC");
         this.tabs--;
+        return ret;
     }
 
     public void VDS() throws Exception {
         this.tabs++;
-        this.emit("VT()");
+        this.STEmit("VT()");
         this.VT();
-        this.emit("PUNCT -> " + this.look.b);
+        this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ":");
-        this.emit("VAR()");
+        this.STEmit("VAR()");
         this.VAR();
-        this.emit("PUNCT -> " + this.look.b);
+        this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ";");
         this.tabs--;
         this.curr_dt = null;
@@ -279,10 +370,14 @@ public class Parser {
 
     public void VAR() throws Exception {
         this.tabs++;
-        this.emit("ID -> " + this.look.b);
-        this.symbolTable.put(this.look.b, this.curr_dt);
+        this.STEmit("ID -> " + this.look.b);
+        this.symbolTable.put(this.look.b, new Pair<Tokens, Integer>(this.curr_dt, this.nextVar));
+        if (this.curr_dt == Tokens.INT)
+            this.nextVar += 4;
+        else if (this.curr_dt == Tokens.CHAR)
+            this.nextVar += 1;
         this.match(Tokens.ID);
-        this.emit("VAR1()");
+        this.STEmit("VAR1()");
         this.VAR1();
         this.tabs--;
     }
@@ -290,12 +385,16 @@ public class Parser {
     public void VAR1() throws Exception {
         this.tabs++;
         if (this.look.b.equals(",")) {
-            this.emit("PUNCT -> " + this.look.b);
+            this.STEmit("PUNCT -> " + this.look.b);
             this.match(Tokens.PUNCT, ",");
-            this.emit("ID -> " + this.look.b);
-            this.symbolTable.put(this.look.b, this.curr_dt);
+            this.STEmit("ID -> " + this.look.b);
+            this.symbolTable.put(this.look.b, new Pair<Tokens, Integer>(this.curr_dt, this.nextVar));
+            if (this.curr_dt == Tokens.INT)
+                this.nextVar += 4;
+            else if (this.curr_dt == Tokens.CHAR)
+                this.nextVar += 1;
             this.match(Tokens.ID);
-            this.emit("VAR1()");
+            this.STEmit("VAR1()");
             this.VAR1();
         }
         this.tabs--;
@@ -304,11 +403,11 @@ public class Parser {
     public void VT() throws Exception {
         this.tabs++;
         if (this.look.a.equals(Tokens.INT)) {
-            this.emit("INT -> " + this.look.b);
+            this.STEmit("INT -> " + this.look.b);
             this.match(Tokens.INT);
             this.curr_dt = Tokens.INT;
         } else if (this.look.a.equals(Tokens.CHAR)) {
-            this.emit("CHAR -> " + this.look.b);
+            this.STEmit("CHAR -> " + this.look.b);
             this.match(Tokens.CHAR);
             this.curr_dt = Tokens.CHAR;
         } else
@@ -317,164 +416,211 @@ public class Parser {
     }
 
     public void VAS() throws Exception {
+        StringBuilder stmt = new StringBuilder();
         this.tabs++;
-        this.emit("ID -> " + this.look.b);
+        this.STEmit("ID -> " + this.look.b);
+        stmt.append(this.look.b).append(" = ");
         this.match(Tokens.ID);
-        this.emit("ASO -> " + this.look.b);
+        this.STEmit("ASO -> " + this.look.b);
         this.match(Tokens.ASO, ":=");
-        this.emit("VAL()");
-        this.VAL();
-        this.emit("PUNCT -> " + this.look.b);
+        this.STEmit("VAL()");
+        stmt.append(this.VAL());
+        this.TAEmit(stmt.toString());
+        this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ";");
         this.tabs--;
     }
 
-    public void VAL() throws Exception {
+    public String VAL() throws Exception {
+        String ret;
         this.tabs++;
         if (this.look.a.equals(Tokens.NUM) && !(this.tokens.get(tokenIdx).a.equals(Tokens.AO))) {
-            this.emit("NUM -> " + this.look.b);
+            this.STEmit("NUM -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.NUM);
         } else if (this.look.a.equals(Tokens.LTC)) {
-            this.emit("LTC -> " + this.look.b);
+            this.STEmit("LTC -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.LTC);
         } else if (this.look.a.equals(Tokens.ID) && !(this.tokens.get(tokenIdx).a.equals(Tokens.AO))
                 && !(this.tokens.get(tokenIdx).b.equals("("))) {
-            this.emit("ID -> " + this.look.b);
+            this.STEmit("ID -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.ID);
         } else if (this.tokens.get(tokenIdx).a.equals(Tokens.AO)) {
-            this.emit("AE()");
-            this.AE();
+            this.STEmit("AE()");
+            ret = this.AE();
         } else if (this.look.a.equals(Tokens.ID) && this.tokens.get(tokenIdx).b.equals("(")) {
-            this.emit("FC()");
+            this.STEmit("FC()");
+            ret = "";
             this.FC();
         } else
             throw new Exception("MATCH FAILED: unknown or invalid token/lexeme in VT");
         this.tabs--;
+        return ret;
     }
 
     public void PS() throws Exception {
+        StringBuilder stmnt = new StringBuilder();
         this.tabs++;
-        this.emit("PK()");
-        this.PK();
-        this.emit("BRKT -> " + this.look.b);
+        this.STEmit("PK()");
+        boolean isPrintln = this.PK();
+        stmnt.append("OUT ");
+        this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "(");
-        this.emit("DATA()");
-        this.DATA();
-        this.emit("BRKT -> " + this.look.b);
+        this.STEmit("DATA()");
+        stmnt.append(this.DATA());
+        this.TAEmit(stmnt.toString());
+        if (isPrintln)
+            this.TAEmit("OUT \\n");
+        this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, ")");
-        this.emit("PUNCT -> " + this.look.b);
+        this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ";");
         this.tabs--;
     }
 
-    public void PK() throws Exception {
+    public boolean PK() throws Exception {
+        boolean ret = false;
         this.tabs++;
         if (this.look.b.equals("print")) {
-            this.emit("IOF -> " + this.look.b);
+            this.STEmit("IOF -> " + this.look.b);
             this.match(Tokens.IOF, "print");
+            ret = false;
         } else if (this.look.b.equals("println")) {
-            this.emit("IOF -> " + this.look.b);
+            this.STEmit("IOF -> " + this.look.b);
             this.match(Tokens.IOF, "println");
+            ret = true;
         } else
             throw new Exception("MATCH FAILED: unknown or invalid token/lexeme in PK");
         this.tabs--;
+        return ret;
     }
 
-    public void DATA() throws Exception {
+    public String DATA() throws Exception {
+        String ret = new String();
         this.tabs++;
         if (this.look.a.equals(Tokens.ID) && !(this.tokens.get(tokenIdx).a.equals(Tokens.AO))) {
-            this.emit("ID -> " + this.look.b);
+            this.STEmit("ID -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.ID);
         } else if (this.look.a.equals(Tokens.NUM) && !(this.tokens.get(tokenIdx).a.equals(Tokens.AO))) {
-            this.emit("NUM -> " + this.look.b);
+            this.STEmit("NUM -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.NUM);
         } else if (this.look.a.equals(Tokens.LTC)) {
-            this.emit("LTC -> " + this.look.b);
+            this.STEmit("LTC -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.LTC);
         } else if (this.look.a.equals(Tokens.STR)) {
-            this.emit("STR -> " + this.look.b);
+            this.STEmit("STR -> " + this.look.b);
+            ret = this.look.b;
             this.match(Tokens.STR);
         } else {
-            this.emit("AE()");
-            this.AE();
+            this.STEmit("AE()");
+            ret = this.AE();
         }
         this.tabs--;
+        return ret;
     }
 
     public void INS() throws Exception {
         this.tabs++;
-        this.emit("IOF -> " + this.look.b);
+        this.STEmit("IOF -> " + this.look.b);
         this.match(Tokens.IOF, "In");
-        this.emit("IO -> " + this.look.b);
+        this.STEmit("IO -> " + this.look.b);
         this.match(Tokens.IO);
-        this.emit("ID -> " + this.look.b);
+        this.STEmit("ID -> " + this.look.b);
+        this.TAEmit("IN " + this.look.b);
         this.match(Tokens.ID);
-        this.emit("PUNCT -> " + this.look.b);
+        this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ";");
         this.tabs--;
     }
 
     public void LS() throws Exception {
         this.tabs++;
-        this.emit("WHILE -> " + this.look.b);
+        this.STEmit("WHILE -> " + this.look.b);
         this.match(Tokens.WHILE);
-        this.emit("LE()");
-        this.LE();
-        this.emit("PUNCT -> " + this.look.b);
+        this.STEmit("LE()");
+        String expression = this.LE();
+        this.TAEmit("if " + expression + " GOTO " + (this.lines + 2));
+        int while_line = this.lines - 1;
+        this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ":");
-        this.emit("BRKT -> " + this.look.b);
+        this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "{");
-        this.emit("CB()");
+        this.TAEmit("GOTO");
+        int false_line = this.lines - 1;
+        this.STEmit("CB()");
         this.CB();
-        this.emit("BRKT -> " + this.look.b);
+        this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "}");
+        this.TAEmit("GOTO " + while_line);
+        this.backpatch(false_line, this.lines);
         this.tabs--;
     }
 
     public void CS() throws Exception {
+        ArrayList<Integer> jumps = new ArrayList<>();
         this.tabs++;
-        this.emit("DS -> " + this.look.b);
+        this.STEmit("DS -> " + this.look.b);
         this.match(Tokens.DS, "if");
-        this.emit("LE()");
-        this.LE();
-        this.emit("PUNCT -> " + this.look.b);
+        this.STEmit("LE()");
+        String expression = this.LE();
+        TAEmit("if " + expression + " GOTO " + (this.lines + 2));
+        this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ":");
-        this.emit("BRKT -> " + this.look.b);
+        this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "{");
-        this.emit("CB()");
+        TAEmit("GOTO");
+        int false_line = this.lines - 1;
+        this.STEmit("CB()");
         this.CB();
-        this.emit("BRKT -> " + this.look.b);
+        this.TAEmit("GOTO");
+        jumps.add(this.lines-1);
+        this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "}");
-        this.emit("CE()");
-        this.CE();
+        this.backpatch(false_line, this.lines);
+        this.STEmit("CE()");
+        this.CE(jumps); // else and elif
         this.tabs--;
+        jumps.forEach(l -> {
+            this.backpatch(l, this.lines);
+        });
     }
 
-    public void CE() throws Exception {
+    public void CE(ArrayList<Integer> jumps) throws Exception {
         this.tabs++;
         if (look.b.equals("elif")) {
-            this.emit("DS -> " + this.look.b);
+            this.STEmit("DS -> " + this.look.b);
             this.match(Tokens.DS, "elif");
-            this.emit("LE()");
-            this.LE();
-            this.emit("PUNCT -> " + this.look.b);
+            this.STEmit("LE()");
+            String expression = this.LE();
+            TAEmit("if " + expression + " GOTO " + (this.lines + 2));
+            this.STEmit("PUNCT -> " + this.look.b);
             this.match(Tokens.PUNCT, ":");
-            this.emit("BRKT -> " + this.look.b);
+            this.STEmit("BRKT -> " + this.look.b);
             this.match(Tokens.BRKT, "{");
-            this.emit("CB()");
+            TAEmit("GOTO");
+            int false_line = this.lines - 1;
+            this.STEmit("CB()");
             this.CB();
-            this.emit("BRKT -> " + this.look.b);
+            this.TAEmit("GOTO");
+            jumps.add(this.lines-1);
+            this.STEmit("BRKT -> " + this.look.b);
             this.match(Tokens.BRKT, "}");
-            this.emit("CE()");
-            this.CE();
+            this.backpatch(false_line, this.lines);
+            this.STEmit("CE()");
+            this.CE(jumps);
         } else if (look.b.equals("else")) {
-            this.emit("DS -> " + this.look.b);
+            this.STEmit("DS -> " + this.look.b);
             this.match(Tokens.DS, "else");
-            this.emit("BRKT -> " + this.look.b);
+            this.STEmit("BRKT -> " + this.look.b);
             this.match(Tokens.BRKT, "{");
-            this.emit("CB()");
+            this.STEmit("CB()");
             this.CB();
-            this.emit("BRKT -> " + this.look.b);
+            this.STEmit("BRKT -> " + this.look.b);
             this.match(Tokens.BRKT, "}");
         }
         this.tabs--;
@@ -482,34 +628,34 @@ public class Parser {
 
     public void FS() throws Exception {
         this.tabs++;
-        this.emit("FUNC -> " + this.look.b);
+        this.STEmit("FUNC -> " + this.look.b);
         this.match(Tokens.FUNC);
-        this.emit("VT()");
+        this.STEmit("VT()");
         this.VT();
-        this.emit("PUNCT -> " + this.look.b);
+        this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ":");
-        this.emit("ID -> " + this.look.b);
-        this.symbolTable.put(this.look.b, Tokens.FUNC);
+        this.STEmit("ID -> " + this.look.b);
+        // this.symbolTable.put(this.look.b, Tokens.FUNC);
         this.match(Tokens.ID);
-        this.emit("BRKT -> " + this.look.b);
+        this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "(");
-        this.emit("VT()");
+        this.STEmit("VT()");
         this.VT();
-        this.emit("PUNCT -> " + this.look.b);
+        this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ":");
-        this.emit("ID -> " + this.look.b);
+        this.STEmit("ID -> " + this.look.b);
         this.match(Tokens.ID);
-        this.emit("PR()");
+        this.STEmit("PR()");
         this.PR();
-        this.emit("BRKT -> " + this.look.b);
+        this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, ")");
-        this.emit("BRKT -> " + this.look.b);
+        this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "{");
-        this.emit("CB()");
+        this.STEmit("CB()");
         this.CB();
-        this.emit("RE()");
+        this.STEmit("RE()");
         this.RE();
-        this.emit("BRKT -> " + this.look.b);
+        this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "}");
         this.tabs--;
     }
@@ -517,15 +663,15 @@ public class Parser {
     public void PR() throws Exception {
         this.tabs++;
         if (this.look.b.equals(",")) {
-            this.emit("PUNCT -> " + this.look.b);
+            this.STEmit("PUNCT -> " + this.look.b);
             this.match(Tokens.PUNCT, ",");
-            this.emit("VT()");
+            this.STEmit("VT()");
             this.VT();
-            this.emit("PUNCT -> " + this.look.b);
+            this.STEmit("PUNCT -> " + this.look.b);
             this.match(Tokens.PUNCT, ":");
-            this.emit("ID -> " + this.look.b);
+            this.STEmit("ID -> " + this.look.b);
             this.match(Tokens.ID);
-            this.emit("PR()");
+            this.STEmit("PR()");
             this.PR();
         }
         this.tabs--;
@@ -533,11 +679,11 @@ public class Parser {
 
     public void RE() throws Exception {
         this.tabs++;
-        this.emit("RET -> " + this.look.b);
+        this.STEmit("RET -> " + this.look.b);
         this.match(Tokens.RET);
-        this.emit("RS()");
+        this.STEmit("RS()");
         this.RS();
-        this.emit("PUNCT -> " + this.look.b);
+        this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ";");
         this.tabs--;
     }
@@ -545,13 +691,13 @@ public class Parser {
     public void RS() throws Exception {
         this.tabs++;
         if (look.a.equals(Tokens.ID)) {
-            this.emit("ID -> " + this.look.b);
+            this.STEmit("ID -> " + this.look.b);
             this.match(Tokens.ID);
         } else if (look.a.equals(Tokens.NUM)) {
-            this.emit("NUM -> " + this.look.b);
+            this.STEmit("NUM -> " + this.look.b);
             this.match(Tokens.NUM);
         } else if (look.a.equals(Tokens.LTC)) {
-            this.emit("LTC -> " + this.look.b);
+            this.STEmit("LTC -> " + this.look.b);
             this.match(Tokens.LTC);
         } else
             throw new Exception("MATCH FAILED: unknown or invalid token/lexeme in look, encountered at RS()");
@@ -561,9 +707,9 @@ public class Parser {
     public void CB() throws Exception {
         this.tabs++;
         if (this.look != null && !this.look.b.equals("}") && !this.look.a.equals(Tokens.RET)) {
-            this.emit("ST()");
+            this.STEmit("ST()");
             this.ST();
-            this.emit("CB()");
+            this.STEmit("CB()");
             this.CB();
         }
         this.tabs--;
@@ -571,17 +717,17 @@ public class Parser {
 
     public void FC() throws Exception {
         this.tabs++;
-        this.emit("ID -> " + this.look.b);
+        this.STEmit("ID -> " + this.look.b);
         this.match(Tokens.ID);
-        this.emit("BRKT-> " + this.look.b);
+        this.STEmit("BRKT-> " + this.look.b);
         this.match(Tokens.BRKT, "(");
-        this.emit("ID -> " + this.look.b);
+        this.STEmit("ID -> " + this.look.b);
         this.match(Tokens.ID);
-        this.emit("FR()");
+        this.STEmit("FR()");
         this.FR();
-        this.emit("BRKT -> " + this.look.b);
+        this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, ")");
-        this.emit("PUNCT -> " + this.look.b);
+        this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ";");
         this.tabs--;
     }
@@ -589,11 +735,11 @@ public class Parser {
     public void FR() throws Exception {
         this.tabs++;
         if (this.look.b.equals(",")) {
-            this.emit("PUNCT -> " + this.look.b);
+            this.STEmit("PUNCT -> " + this.look.b);
             this.match(Tokens.PUNCT, ",");
-            this.emit("ID -> " + this.look.b);
+            this.STEmit("ID -> " + this.look.b);
             this.match(Tokens.ID);
-            this.emit("FR()");
+            this.STEmit("FR()");
             this.FR();
         }
         this.tabs--;
@@ -602,31 +748,31 @@ public class Parser {
     public void ST() throws Exception {
         this.tabs++;
         if (this.tokens.get(tokenIdx).a.equals(Tokens.AO)) {
-            this.emit("AE()");
+            this.STEmit("AE()");
             this.AE();
         } else if (this.tokens.get(tokenIdx).a.equals(Tokens.RO)) {
-            this.emit("LE()");
+            this.STEmit("LE()");
             this.LE();
         } else if (this.tokens.get(tokenIdx).a.equals(Tokens.PUNCT)) {
-            this.emit("VDS()");
+            this.STEmit("VDS()");
             this.VDS();
         } else if (this.tokens.get(tokenIdx).a.equals(Tokens.ASO)) {
-            this.emit("VAS()");
+            this.STEmit("VAS()");
             this.VAS();
         } else if (this.look.b.matches("print(ln){0,1}")) {
-            this.emit("PS()");
+            this.STEmit("PS()");
             this.PS();
         } else if (this.look.b.equals("In")) {
-            this.emit("INS()");
+            this.STEmit("INS()");
             this.INS();
         } else if (this.look.a.equals(Tokens.WHILE)) {
-            this.emit("LS()");
+            this.STEmit("LS()");
             this.LS();
         } else if (this.look.b.equals("if")) {
-            this.emit("CS()");
+            this.STEmit("CS()");
             this.CS();
         } else if (this.tokens.get(tokenIdx).b.equals("(")) {
-            this.emit("FC()");
+            this.STEmit("FC()");
             this.FC();
         } else
             throw new Exception("MATCH FAILED: unknown or invalid token/lexeme in look, encountered at ST()");

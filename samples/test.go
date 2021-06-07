@@ -3,6 +3,7 @@ func Integer: numPrint (Integer: num, Integer: length)
 	Integer: i, j, first, temp;
 	char : a;
 	a := 'x';
+	b := c+b*(1 + 2);
 	print ( "enter number" );
 	In>> i;
 	println (i);
