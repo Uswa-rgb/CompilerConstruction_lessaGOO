@@ -272,6 +272,8 @@ public class Parser {
             this.STEmit("EB()");
             op2 = this.EB();
             temp = this.nextTemp();
+            this.symbolTable.put(temp, new Pair<Tokens, Integer>(Tokens.INT, this.nextVar));
+            this.nextVar += 4;
             this.TAEmit(temp + " = " + op1 + " + " + op2);
             this.STEmit("R()");
             ans = this.R(temp);
@@ -281,6 +283,8 @@ public class Parser {
             this.STEmit("EB()");
             op2 = this.EB();
             temp = this.nextTemp();
+            this.symbolTable.put(temp, new Pair<Tokens, Integer>(Tokens.INT, this.nextVar));
+            this.nextVar += 4;
             this.TAEmit(temp + " = " + op1 + " - " + op2);
             this.STEmit("R()");
             ans = this.R(temp);
@@ -311,6 +315,8 @@ public class Parser {
             this.STEmit("EC()");
             op2 = this.EC();
             temp = this.nextTemp();
+            this.symbolTable.put(temp, new Pair<Tokens, Integer>(Tokens.INT, this.nextVar));
+            this.nextVar += 4;
             this.TAEmit(temp + " = " + op1 + " * " + op2);
             this.STEmit("R1()");
             ans = this.R1(temp);
@@ -320,6 +326,8 @@ public class Parser {
             this.STEmit("EC()");
             op2 = this.EC();
             temp = this.nextTemp();
+            this.symbolTable.put(temp, new Pair<Tokens, Integer>(Tokens.INT, this.nextVar));
+            this.nextVar += 4;
             this.TAEmit(temp + " = " + op1 + " / " + op2);
             this.STEmit("R1()");
             ans = this.R1(temp);
@@ -577,7 +585,7 @@ public class Parser {
         this.STEmit("CB()");
         this.CB();
         this.TAEmit("GOTO");
-        jumps.add(this.lines-1);
+        jumps.add(this.lines - 1);
         this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "}");
         this.backpatch(false_line, this.lines);
@@ -606,7 +614,7 @@ public class Parser {
             this.STEmit("CB()");
             this.CB();
             this.TAEmit("GOTO");
-            jumps.add(this.lines-1);
+            jumps.add(this.lines - 1);
             this.STEmit("BRKT -> " + this.look.b);
             this.match(Tokens.BRKT, "}");
             this.backpatch(false_line, this.lines);

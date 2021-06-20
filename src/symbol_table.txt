@@ -1,6 +1,11 @@
 Identifier	Data Type
+T4        INT       29
 a         CHAR      16
+T5        INT       33
 temp      INT       12
 i         INT       0
 j         INT       4
+T1        INT       17
 first     INT       8
+T2        INT       21
+T3        INT       25
