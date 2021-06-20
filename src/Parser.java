@@ -10,6 +10,7 @@ import java.io.File;
 public class Parser {
     ArrayList<Pair<Tokens, String>> tokens;
     ArrayList<StringBuilder> _3AC;
+    ArrayList<Pair<Pair<StringBuilder, StringBuilder>, Pair<StringBuilder, StringBuilder>>> Quads;
     HashMap<String, Pair<Tokens, Integer>> symbolTable;
     BufferedWriter treBufferedWriter;
     BufferedReader wordFileReader;
@@ -87,11 +88,37 @@ public class Parser {
             System.out.println(e);
         }
     }
+    public void dumpMachineCode() {
+        try {
+            FileWriter st = new FileWriter("./mc.txt");
+            this.Quads.forEach((s) -> {
+                try {
+                    st.write(s.a.a.toString() + " ");
+                    st.write(s.a.b.toString() + " ");
+                    st.write(s.b.a.toString() + " ");
+                    st.write(s.b.b.toString() + "\n");
+                } catch (IOException e) {
+                    System.out.println("[Parser-D3AC] Exception Occurred.");
+                    System.out.println(e);
+                }
+            });
+            st.close();
+        } catch (IOException e) {
+            System.out.println("[Parser-MCD] Exception Occurred.");
+            System.out.println(e);
+        }
+    }
 
     public void backpatch(int src, int dest) {
         this._3AC.get(src - 1).append(" ").append(dest);
     }
 
+    public void MCEmit(String a, String b, String c, String d){
+        Pair<StringBuilder, StringBuilder> first = new Pair<StringBuilder,StringBuilder>(new StringBuilder(a), new StringBuilder(b));
+        Pair<StringBuilder, StringBuilder> second = new Pair<StringBuilder,StringBuilder>(new StringBuilder(c), new StringBuilder(d));
+        Pair<Pair<StringBuilder, StringBuilder>, Pair<StringBuilder, StringBuilder>> third = new Pair<>(first, second);
+        this.Quads.add(third);
+    }
     public void TAEmit(String str) {
         // emit code
         this._3AC.add(new StringBuilder(str));
