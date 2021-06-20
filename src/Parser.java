@@ -8,12 +8,13 @@ import java.util.HashMap;
 import java.io.File;
 
 public class Parser {
+    ArrayList<Quartet<StringBuilder, StringBuilder, StringBuilder, StringBuilder>> Quads;
+    HashMap<String, Triplet<Tokens, String, Integer>> symbolTable;
     ArrayList<Pair<Tokens, String>> tokens;
-    ArrayList<StringBuilder> _3AC;
-    ArrayList<Pair<Pair<StringBuilder, StringBuilder>, Pair<StringBuilder, StringBuilder>>> Quads;
-    HashMap<String, Pair<Tokens, Integer>> symbolTable;
+    HashMap<String, Integer> opcodes;
     BufferedWriter treBufferedWriter;
     BufferedReader wordFileReader;
+    ArrayList<StringBuilder> _3AC;
     Pair<Tokens, String> look;
     Boolean toPrint = true;
     Tokens curr_dt;
@@ -30,14 +31,61 @@ public class Parser {
             this.tokenIdx = 0;
             this.nextVar = 0;
             this.temp = 1;
+            this.Quads = new ArrayList<>();
+            this.init_opcodes();
             this._3AC = new ArrayList<>();
             this.symbolTable = new HashMap<>();
             this.tokens = new ArrayList<Pair<Tokens, String>>();
             this.treBufferedWriter = new BufferedWriter(new FileWriter(new File("./parse_tree.txt")));
+
         } catch (Exception e) {
             System.out.println("[Parser - Init] Exception Occurred.");
             System.out.println(e);
         }
+    }
+
+    private void init_opcodes() {
+        this.opcodes = new HashMap<>();
+        // populating the hash table for opcodes
+        this.opcodes.put("+", 10); // arithematic operators
+        this.opcodes.put("-", 11);
+        this.opcodes.put("*", 12);
+        this.opcodes.put("/", 13);
+
+        this.opcodes.put(":=", 20); // assignment, io and jumps
+        this.opcodes.put("IN", 21);
+        this.opcodes.put("OUT", 22);
+        this.opcodes.put("OUTN", 23);
+        this.opcodes.put("GOTO", 24);
+
+        this.opcodes.put("=", 30); // logical operators
+        this.opcodes.put(">", 31);
+        this.opcodes.put("<", 32);
+        this.opcodes.put(">=", 33);
+        this.opcodes.put("<=", 34);
+        this.opcodes.put("/=", 35);
+    }
+
+    public String getIdFromTemp(String in) {
+        if (this.symbolTable.get(in) == null) {
+            String temp = this.nextTemp();
+            Tokens type;
+            if (Character.isDigit(in.charAt(0)))
+                type = Tokens.INT;
+            else
+                type = Tokens.CHAR;
+            symbolTable.put(temp, new Triplet<Tokens, String, Integer>(type, in, this.nextVar));
+            if (type.equals(Tokens.INT))
+                this.nextVar += 4;
+            else
+                this.nextVar += 1;
+            return temp;
+        }
+        return in;
+    }
+
+    public String getAddress(String ID) {
+        return this.symbolTable.get(ID).c.toString();
     }
 
     public String nextTemp() {
@@ -48,7 +96,7 @@ public class Parser {
         try {
             StringBuilder buffer = new StringBuilder();
             FileWriter st = new FileWriter("./symbol_table.txt");
-            st.write("Identifier\tData Type\n");
+            st.write("Identifier\tData Type\tInitial\tAddress\n");
             this.symbolTable.forEach((k, p) -> {
                 try {
                     buffer.append(k);
@@ -57,7 +105,10 @@ public class Parser {
                     buffer.append(p.a);
                     for (int i = 0; i < 10 - p.a.toString().length(); i++)
                         buffer.append(" ");
-                    buffer.append(p.b).append("\n");
+                    buffer.append(p.b);
+                    for (int i = 0; i < 10 - p.b.toString().length(); i++)
+                        buffer.append(" ");
+                    buffer.append(p.c).append("\n");
                     st.write(buffer.toString());
                     buffer.setLength(0);
                 } catch (IOException e) {
@@ -88,15 +139,16 @@ public class Parser {
             System.out.println(e);
         }
     }
+
     public void dumpMachineCode() {
         try {
             FileWriter st = new FileWriter("./mc.txt");
             this.Quads.forEach((s) -> {
                 try {
-                    st.write(s.a.a.toString() + " ");
-                    st.write(s.a.b.toString() + " ");
-                    st.write(s.b.a.toString() + " ");
-                    st.write(s.b.b.toString() + "\n");
+                    st.write(s.a.toString() + " ");
+                    st.write(s.b.toString() + " ");
+                    st.write(s.c.toString() + " ");
+                    st.write(s.d.toString() + "\n");
                 } catch (IOException e) {
                     System.out.println("[Parser-D3AC] Exception Occurred.");
                     System.out.println(e);
@@ -113,12 +165,22 @@ public class Parser {
         this._3AC.get(src - 1).append(" ").append(dest);
     }
 
-    public void MCEmit(String a, String b, String c, String d){
-        Pair<StringBuilder, StringBuilder> first = new Pair<StringBuilder,StringBuilder>(new StringBuilder(a), new StringBuilder(b));
-        Pair<StringBuilder, StringBuilder> second = new Pair<StringBuilder,StringBuilder>(new StringBuilder(c), new StringBuilder(d));
-        Pair<Pair<StringBuilder, StringBuilder>, Pair<StringBuilder, StringBuilder>> third = new Pair<>(first, second);
-        this.Quads.add(third);
+    public void backpatchMC(int src, int dest) {
+        // System.out.println(src);
+        Quartet<StringBuilder, StringBuilder, StringBuilder, StringBuilder> quad = this.Quads.get(src - 1);
+        if (quad.b.toString().equals("")) {
+            quad.b.insert(0, Integer.toString(dest));
+        } else
+            quad.d.insert(0, Integer.toString(dest));
     }
+
+    public void MCEmit(String a, String b, String c, String d) {
+        System.out.println("Inside MC Emit: " + a + " " + " " + b + " " + c + " " + d);
+        Quartet<StringBuilder, StringBuilder, StringBuilder, StringBuilder> obj = new Quartet<>(new StringBuilder(a),
+                new StringBuilder(b), new StringBuilder(c), new StringBuilder(d));
+        this.Quads.add(obj);
+    }
+
     public void TAEmit(String str) {
         // emit code
         this._3AC.add(new StringBuilder(str));
@@ -203,17 +265,16 @@ public class Parser {
         }
     }
 
-    public String LE() throws Exception {
-        StringBuilder expression = new StringBuilder();
+    public Triplet<String, String, String> LE() throws Exception {
         this.tabs++;
         this.STEmit("LID()");
-        expression.append(this.LID());
+        String op1 = this.getIdFromTemp(this.LID());
         this.STEmit("LO()");
-        expression.append(this.LO());
+        String opr = this.LO();
         this.STEmit("LID()");
-        expression.append(this.LID());
+        String op2 = this.getIdFromTemp(this.LID());
         this.tabs--;
-        return expression.toString();
+        return new Triplet<String, String, String>(op1, opr, op2);
     }
 
     public String LID() throws Exception {
@@ -299,8 +360,13 @@ public class Parser {
             this.STEmit("EB()");
             op2 = this.EB();
             temp = this.nextTemp();
-            this.symbolTable.put(temp, new Pair<Tokens, Integer>(Tokens.INT, this.nextVar));
+            this.symbolTable.put(temp, new Triplet<Tokens, String, Integer>(Tokens.INT, "0", this.nextVar));
             this.nextVar += 4;
+            // this.symbolTable.forEach((k, v) -> {
+            //     System.out.println(k + " " + v.a + " "+ v.b + " " +v.c);
+            // });
+            // System.out.println("operands" + op1 + " " + op2 + " " + temp);
+            this.MCEmit(this.opcodes.get("+").toString(), getAddress(op1), getAddress(op2), getAddress(temp));
             this.TAEmit(temp + " = " + op1 + " + " + op2);
             this.STEmit("R()");
             ans = this.R(temp);
@@ -310,8 +376,9 @@ public class Parser {
             this.STEmit("EB()");
             op2 = this.EB();
             temp = this.nextTemp();
-            this.symbolTable.put(temp, new Pair<Tokens, Integer>(Tokens.INT, this.nextVar));
+            this.symbolTable.put(temp, new Triplet<Tokens, String, Integer>(Tokens.INT, "0", this.nextVar));
             this.nextVar += 4;
+            this.MCEmit(this.opcodes.get("-").toString(), getAddress(op1), getAddress(op2), getAddress(temp));
             this.TAEmit(temp + " = " + op1 + " - " + op2);
             this.STEmit("R()");
             ans = this.R(temp);
@@ -342,8 +409,9 @@ public class Parser {
             this.STEmit("EC()");
             op2 = this.EC();
             temp = this.nextTemp();
-            this.symbolTable.put(temp, new Pair<Tokens, Integer>(Tokens.INT, this.nextVar));
+            this.symbolTable.put(temp, new Triplet<Tokens, String, Integer>(Tokens.INT, "0", this.nextVar));
             this.nextVar += 4;
+            this.MCEmit(this.opcodes.get("*").toString(), getAddress(op1), getAddress(op2), getAddress(temp));
             this.TAEmit(temp + " = " + op1 + " * " + op2);
             this.STEmit("R1()");
             ans = this.R1(temp);
@@ -353,8 +421,9 @@ public class Parser {
             this.STEmit("EC()");
             op2 = this.EC();
             temp = this.nextTemp();
-            this.symbolTable.put(temp, new Pair<Tokens, Integer>(Tokens.INT, this.nextVar));
+            this.symbolTable.put(temp, new Triplet<Tokens, String, Integer>(Tokens.INT, "0", this.nextVar));
             this.nextVar += 4;
+            this.MCEmit(this.opcodes.get("/").toString(), getAddress(op1), getAddress(op2), getAddress(temp));
             this.TAEmit(temp + " = " + op1 + " / " + op2);
             this.STEmit("R1()");
             ans = this.R1(temp);
@@ -363,6 +432,8 @@ public class Parser {
         this.tabs--;
         return ans;
     }
+    // int a;
+    // a = 5;
 
     public String EC() throws Exception {
         String ret;
@@ -373,7 +444,12 @@ public class Parser {
             this.match(Tokens.ID);
         } else if (this.look.a.equals(Tokens.NUM)) {
             this.STEmit("ID -> " + this.look.b);
-            ret = this.look.b;
+            // move the number literal to a temp variable, and return that temp
+            String temp = this.nextTemp();
+            this.symbolTable.put(temp, new Triplet<Tokens, String, Integer>(Tokens.INT, this.look.b, this.nextVar));
+            this.nextVar += 4;
+            // ret = this.look.b;
+            ret = temp;
             this.match(Tokens.NUM);
         } else if (this.look.b.equals("(")) {
             this.STEmit("BRKT -> " + this.look.b);
@@ -405,7 +481,7 @@ public class Parser {
     public void VAR() throws Exception {
         this.tabs++;
         this.STEmit("ID -> " + this.look.b);
-        this.symbolTable.put(this.look.b, new Pair<Tokens, Integer>(this.curr_dt, this.nextVar));
+        this.symbolTable.put(this.look.b, new Triplet<Tokens, String, Integer>(this.curr_dt, "0", this.nextVar));
         if (this.curr_dt == Tokens.INT)
             this.nextVar += 4;
         else if (this.curr_dt == Tokens.CHAR)
@@ -422,7 +498,7 @@ public class Parser {
             this.STEmit("PUNCT -> " + this.look.b);
             this.match(Tokens.PUNCT, ",");
             this.STEmit("ID -> " + this.look.b);
-            this.symbolTable.put(this.look.b, new Pair<Tokens, Integer>(this.curr_dt, this.nextVar));
+            this.symbolTable.put(this.look.b, new Triplet<Tokens, String, Integer>(this.curr_dt, "0", this.nextVar));
             if (this.curr_dt == Tokens.INT)
                 this.nextVar += 4;
             else if (this.curr_dt == Tokens.CHAR)
@@ -453,13 +529,17 @@ public class Parser {
         StringBuilder stmt = new StringBuilder();
         this.tabs++;
         this.STEmit("ID -> " + this.look.b);
+        String dest = new String(this.look.b);
         stmt.append(this.look.b).append(" = ");
         this.match(Tokens.ID);
         this.STEmit("ASO -> " + this.look.b);
         this.match(Tokens.ASO, ":=");
         this.STEmit("VAL()");
-        stmt.append(this.VAL());
+        String value = this.VAL();
+        stmt.append(value);
         this.TAEmit(stmt.toString());
+        String id = getIdFromTemp(value);
+        this.MCEmit(this.opcodes.get(":=").toString(), getAddress( id), getAddress(dest), "");
         this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ";");
         this.tabs--;
@@ -503,10 +583,13 @@ public class Parser {
         this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "(");
         this.STEmit("DATA()");
-        stmnt.append(this.DATA());
+        String data = this.getIdFromTemp(this.DATA());
+        stmnt.append(data);
         this.TAEmit(stmnt.toString());
+        this.MCEmit(this.opcodes.get("OUT").toString(), getAddress(data), "", "");
         if (isPrintln)
             this.TAEmit("OUT \\n");
+        this.MCEmit(this.opcodes.get("OUTN").toString(), "", "", "");
         this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, ")");
         this.STEmit("PUNCT -> " + this.look.b);
@@ -566,6 +649,7 @@ public class Parser {
         this.match(Tokens.IO);
         this.STEmit("ID -> " + this.look.b);
         this.TAEmit("IN " + this.look.b);
+        this.MCEmit(this.opcodes.get("IN").toString(), getAddress(this.look.b), "", "");
         this.match(Tokens.ID);
         this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ";");
@@ -577,20 +661,26 @@ public class Parser {
         this.STEmit("WHILE -> " + this.look.b);
         this.match(Tokens.WHILE);
         this.STEmit("LE()");
-        String expression = this.LE();
-        this.TAEmit("if " + expression + " GOTO " + (this.lines + 2));
+        Triplet<String, String, String> expression = this.LE();
+        String expression_string = expression.a + " " + expression.b + " " + expression.c;
+        this.MCEmit(this.opcodes.get(expression.b).toString(), getAddress(expression.a), getAddress(expression.c),
+                Integer.toString(this.lines + 2));
+        this.TAEmit("if " + expression_string + " GOTO " + (this.lines + 2));
         int while_line = this.lines - 1;
         this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ":");
         this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "{");
+        this.MCEmit(this.opcodes.get("GOTO").toString(), "", "", "");
         this.TAEmit("GOTO");
         int false_line = this.lines - 1;
         this.STEmit("CB()");
         this.CB();
         this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "}");
+        this.MCEmit(this.opcodes.get("GOTO").toString(), Integer.toString(while_line), "", "");
         this.TAEmit("GOTO " + while_line);
+        this.backpatchMC(false_line, this.lines);
         this.backpatch(false_line, this.lines);
         this.tabs--;
     }
@@ -601,25 +691,32 @@ public class Parser {
         this.STEmit("DS -> " + this.look.b);
         this.match(Tokens.DS, "if");
         this.STEmit("LE()");
-        String expression = this.LE();
-        TAEmit("if " + expression + " GOTO " + (this.lines + 2));
+        Triplet<String, String, String> expression = this.LE();
+        String expression_string = expression.a + " " + expression.b + " " + expression.c;
+        this.MCEmit(this.opcodes.get(expression.b).toString(), getAddress(expression.a), getAddress(expression.c),
+                Integer.toString(this.lines + 2));
+        this.TAEmit("if " + expression_string + " GOTO " + (this.lines + 2));
         this.STEmit("PUNCT -> " + this.look.b);
         this.match(Tokens.PUNCT, ":");
         this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "{");
-        TAEmit("GOTO");
+        this.MCEmit(this.opcodes.get("GOTO").toString(), "", "", "");
+        this.TAEmit("GOTO");
         int false_line = this.lines - 1;
         this.STEmit("CB()");
         this.CB();
+        this.MCEmit(this.opcodes.get("GOTO").toString(), "", "", "");
         this.TAEmit("GOTO");
         jumps.add(this.lines - 1);
         this.STEmit("BRKT -> " + this.look.b);
         this.match(Tokens.BRKT, "}");
+        this.backpatchMC(false_line, this.lines);
         this.backpatch(false_line, this.lines);
         this.STEmit("CE()");
         this.CE(jumps); // else and elif
         this.tabs--;
         jumps.forEach(l -> {
+            this.backpatchMC(l, this.lines);
             this.backpatch(l, this.lines);
         });
     }
@@ -630,20 +727,26 @@ public class Parser {
             this.STEmit("DS -> " + this.look.b);
             this.match(Tokens.DS, "elif");
             this.STEmit("LE()");
-            String expression = this.LE();
-            TAEmit("if " + expression + " GOTO " + (this.lines + 2));
+            Triplet<String, String, String> expression = this.LE();
+            String expression_string = expression.a + " " + expression.b + " " + expression.c;
+            this.MCEmit(this.opcodes.get(expression.b).toString(), getAddress(expression.a), getAddress(expression.c),
+                    Integer.toString(this.lines + 2));
+            this.TAEmit("if " + expression_string + " GOTO " + (this.lines + 2));
             this.STEmit("PUNCT -> " + this.look.b);
             this.match(Tokens.PUNCT, ":");
             this.STEmit("BRKT -> " + this.look.b);
             this.match(Tokens.BRKT, "{");
-            TAEmit("GOTO");
+            this.MCEmit(this.opcodes.get("GOTO").toString(), "", "", "");
+            this.TAEmit("GOTO");
             int false_line = this.lines - 1;
             this.STEmit("CB()");
             this.CB();
+            this.MCEmit(this.opcodes.get("GOTO").toString(), "", "", "");
             this.TAEmit("GOTO");
             jumps.add(this.lines - 1);
             this.STEmit("BRKT -> " + this.look.b);
             this.match(Tokens.BRKT, "}");
+            this.backpatchMC(false_line, this.lines);
             this.backpatch(false_line, this.lines);
             this.STEmit("CE()");
             this.CE(jumps);

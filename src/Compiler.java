@@ -28,8 +28,11 @@ public class Compiler {
         else{
             System.out.println("[++] Parser terminated successfully.");
             p.dumpSymbolTable();
-            p.dump3AddCode();
             System.out.println("[++] Symbol table dumped.");
+            p.dump3AddCode();
+            System.out.println("[++] Three Address Code dumped");
+            p.dumpMachineCode();
+            System.out.println("[++] Machine Code dumped");
             System.exit(0);
         }
 

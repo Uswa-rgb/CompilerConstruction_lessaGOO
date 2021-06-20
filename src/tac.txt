@@ -1,34 +1,17 @@
 a = 'x'
-T1 = 1 + 2
-T2 = b * T1
-T3 = c + T2
-b = T3
-OUT "enter number"
+c = 5
+b = 1
+T6 = T4 + T5
+T7 = b * T6
+T8 = c + T7
+b = T8
 IN i
 OUT i
 OUT \n
-i = length
-if i>0 GOTO 13
-GOTO 32
-first = 0
-j = 1
-if j<i GOTO 17
-GOTO 20
-T4 = j + 1
-j = T4
-GOTO 15
-if j=1 GOTO 22
-GOTO 24
-OUT "one"
-GOTO 29
-if j=2 GOTO 26
-GOTO 28
-OUT "two"
-GOTO 29
-OUT "others"
-T5 = i - 1
-i = T5
-GOTO 11
-OUT "temp is "
-OUT temp
+if i > T9 GOTO 13
+GOTO 18
+OUT i
 OUT \n
+T11 = i - T10
+i = T11
+GOTO 11
